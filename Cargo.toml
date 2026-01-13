@@ -1,0 +1,19 @@
+[package]
+name = "vault-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+solana-client = "1.18"
+solana-sdk = "1.18"
+spl-token-2022 = "0.9"
+spl-associated-token-account = "2.3"
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
+borsh = "1.0"
+spl-token = "9.0.0"
+spl-token-interface = "2.0.0"
+
+[[bin]]
+name = "test_script"
+path = "src/bin/test_script.rs"
