@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO vaults (\n                vault_pda,\n                program_id,\n                network,\n                owner_pubkey,\n                mint,\n                vault_token_account,\n                total_balance,\n                locked_balance,\n                available_balance,\n                total_deposited,\n                total_withdrawn,\n                created_at,\n                last_synced_at\n            )\n            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)\n            ON CONFLICT (vault_pda) DO UPDATE SET\n                total_balance = EXCLUDED.total_balance,\n                locked_balance = EXCLUDED.locked_balance,\n                available_balance = EXCLUDED.available_balance,\n                total_deposited = EXCLUDED.total_deposited,\n                total_withdrawn = EXCLUDED.total_withdrawn,\n                last_synced_at = EXCLUDED.last_synced_at\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Timestamp",
+        "Timestamp"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "53bde59459c923c37fd6e1948a776929fc1e6695eccb8e4c2d46ca97012193e1"
+}

@@ -2,8 +2,9 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use borsh::BorshDeserialize;
 use solana_transaction_status::EncodedTransactionWithStatusMeta;
+use solana_transaction_status::option_serializer::OptionSerializer;
 
-use crate::idl;
+use vault_backend::idl;
 
 #[derive(Debug)]
 pub enum VaultEvent {
@@ -75,8 +76,8 @@ pub fn decode_events(tx: &EncodedTransactionWithStatusMeta) -> anyhow::Result<Ve
     };
 
     let logs = match &meta.log_messages {
-        Some(l) => l,
-        None => return Ok(events),
+        OptionSerializer::Some(l) => l,
+        _ => return Ok(events),
     };
 
     for log in logs {
@@ -91,3 +92,8 @@ pub fn decode_events(tx: &EncodedTransactionWithStatusMeta) -> anyhow::Result<Ve
 
     Ok(events)
 }
+
+fn main() {
+    println!("Indexer binary");
+}
+

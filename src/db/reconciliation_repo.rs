@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -11,7 +11,7 @@ pub struct ReconciliationRow {
     pub onchain_balance: i64,
     pub offchain_balance: i64,
     pub discrepancy: i64,
-    pub detected_at: DateTime<Utc>,
+    pub detected_at: NaiveDateTime,
     pub resolved: bool,
 }
 
@@ -25,7 +25,7 @@ impl<'a> ReconciliationRepository<'a> {
     }
 
     pub async fn log_discrepancy(&self, entry: &ReconciliationRow) -> anyhow::Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO reconciliation_logs (
                 id,
@@ -40,16 +40,16 @@ impl<'a> ReconciliationRepository<'a> {
             )
             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
             "#,
-            entry.id,
-            entry.vault_pda,
-            entry.program_id,
-            entry.network,
-            entry.onchain_balance,
-            entry.offchain_balance,
-            entry.discrepancy,
-            entry.detected_at,
-            entry.resolved
         )
+        .bind(entry.id)
+        .bind(&entry.vault_pda)
+        .bind(&entry.program_id)
+        .bind(&entry.network)
+        .bind(entry.onchain_balance)
+        .bind(entry.offchain_balance)
+        .bind(entry.discrepancy)
+        .bind(entry.detected_at)
+        .bind(entry.resolved)
         .execute(self.pool)
         .await?;
 
@@ -66,7 +66,7 @@ impl<'a> ReconciliationRepository<'a> {
         offchain_balance: i64,
         discrepancy: i64,
     ) -> anyhow::Result<()> {
-        sqlx::query!(
+        sqlx::query(
             r#"
             INSERT INTO reconciliation_logs (
                 id,
@@ -80,14 +80,14 @@ impl<'a> ReconciliationRepository<'a> {
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
             "#,
-            id,
-            vault_pda,
-            program_id,
-            network,
-            onchain_balance,
-            offchain_balance,
-            discrepancy
         )
+        .bind(id)
+        .bind(vault_pda)
+        .bind(program_id)
+        .bind(network)
+        .bind(onchain_balance)
+        .bind(offchain_balance)
+        .bind(discrepancy)
         .execute(self.pool)
         .await?;
 

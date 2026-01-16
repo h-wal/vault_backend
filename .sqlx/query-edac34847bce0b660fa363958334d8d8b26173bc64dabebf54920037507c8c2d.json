@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO authorized_programs (\n                program_id,\n                admin_pubkey,\n                added_at\n            )\n            VALUES ($1, $2, $3)\n            ON CONFLICT (program_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamp"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "edac34847bce0b660fa363958334d8d8b26173bc64dabebf54920037507c8c2d"
+}

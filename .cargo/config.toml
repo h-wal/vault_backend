@@ -1,0 +1,3 @@
+[env]
+SQLX_OFFLINE = "false"
+DATABASE_URL = "postgres://vault:vaultpassword@localhost/vault_backend"

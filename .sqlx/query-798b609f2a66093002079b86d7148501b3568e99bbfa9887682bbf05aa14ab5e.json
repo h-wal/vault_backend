@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO processed_events (tx_signature) VALUES ($1) ON CONFLICT (tx_signature) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "798b609f2a66093002079b86d7148501b3568e99bbfa9887682bbf05aa14ab5e"
+}

@@ -1,5 +1,5 @@
 use sqlx::PgPool;
-use solana_transaction_status::EncodedTransactionWithStatusMeta;
+use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
 
 use crate::db::{
     processed_events::ProcessedEventsRepo,
@@ -11,24 +11,18 @@ use crate::indexer::event_decoder::{decode_events, VaultEvent};
 use crate::transaction_builder::TransactionBuilder;
 
 pub async fn process_transaction(
-    tx: &EncodedTransactionWithStatusMeta,
+    tx: &EncodedConfirmedTransactionWithStatusMeta,
+    signature: &str,
     pool: &PgPool,
     program_id: &solana_sdk::pubkey::Pubkey,
 ) -> anyhow::Result<()> {
-    let signature = tx
-        .transaction
-        .signatures
-        .get(0)
-        .ok_or_else(|| anyhow::anyhow!("Missing tx signature"))?
-        .to_string();
-
     let processed_repo = ProcessedEventsRepo::new(pool);
 
     if processed_repo.is_processed(&signature).await? {
         return Ok(()); // already indexed
     }
 
-    let events = decode_events(tx)?;
+    let events = decode_events(&tx.transaction)?;
 
     let tx_repo = TransactionRepository::new(pool);
     let vault_repo = VaultRepository::new(pool);
@@ -36,8 +30,8 @@ pub async fn process_transaction(
 
     let tx_builder = TransactionBuilder::new(*program_id);
 
-    let slot = tx.slot;
-    let block_time = tx.block_time.unwrap_or(0) as i64;
+    let slot = tx.slot as i64;
+    let block_time = tx.block_time.unwrap_or(0);
 
     for event in events {
         match event {
@@ -133,8 +127,11 @@ pub async fn process_transaction(
         use chrono::{DateTime, Utc};
         use crate::db::vault_repo::VaultRow;
 
-        let ts = DateTime::<Utc>::from_timestamp(block_time, 0)
-            .unwrap_or_else(|| Utc::now());
+        let ts = {
+            let utc_dt = DateTime::<Utc>::from_timestamp(block_time, 0)
+                .unwrap_or_else(|| Utc::now());
+            utc_dt.naive_utc()
+        };
 
         let all_vaults: Vec<VaultRow> = vault_repo.get_all_vaults().await?;
         snapshot_repo

@@ -1,8 +1,5 @@
-use solana_client::{
-    rpc_client::RpcClient,
-    rpc_config::RpcTransactionConfig,
-};
-use solana_sdk::pubkey::Pubkey;
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use solana_transaction_status::UiTransactionEncoding;
 use sqlx::PgPool;
 
@@ -31,18 +28,16 @@ impl VaultIndexer {
         for sig_info in signatures {
             let signature = sig_info.signature.clone();
 
-            let tx = self.rpc.get_transaction(
-                &signature,
-                RpcTransactionConfig {
-                    encoding: Some(UiTransactionEncoding::JsonParsed),
-                    commitment: None,
-                    max_supported_transaction_version: None,
-                },
-            )?;
+            let sig = signature.parse::<Signature>()?;
+
+            let tx = self
+                .rpc
+                .get_transaction(&sig, UiTransactionEncoding::JsonParsed)?;
 
             // All logic (including idempotency) is handled here
             process_transaction(
                 &tx,
+                &signature,
                 &self.pool,
                 &self.program_id,
             )

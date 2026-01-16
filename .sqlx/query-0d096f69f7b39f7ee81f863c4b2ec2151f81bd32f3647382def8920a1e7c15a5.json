@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO program_calls (\n                tx_signature,\n                caller_program,\n                vault_pda,\n                instruction,\n                amount,\n                slot,\n                block_time\n            )\n            VALUES ($1,$2,$3,$4,$5,$6,$7)\n            ON CONFLICT (tx_signature) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Int8",
+        "Int8",
+        "Timestamp"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0d096f69f7b39f7ee81f863c4b2ec2151f81bd32f3647382def8920a1e7c15a5"
+}

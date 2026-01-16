@@ -22,7 +22,7 @@ impl<'a> ProcessedEventsRepo<'a> {
 
 pub async fn is_processed(pool: &PgPool, sig: &str) -> anyhow::Result<bool> {
     let exists = sqlx::query!(
-        "SELECT 1 FROM processed_events WHERE tx_signature = $1",
+        r#"SELECT 1 AS "exists!" FROM processed_events WHERE tx_signature = $1"#,
         sig
     )
     .fetch_optional(pool)
@@ -34,7 +34,7 @@ pub async fn is_processed(pool: &PgPool, sig: &str) -> anyhow::Result<bool> {
 
 pub async fn mark_processed(pool: &PgPool, sig: &str) -> anyhow::Result<()> {
     sqlx::query!(
-        "INSERT INTO processed_events (tx_signature) VALUES ($1) ON CONFLICT DO NOTHING",
+        "INSERT INTO processed_events (tx_signature) VALUES ($1) ON CONFLICT (tx_signature) DO NOTHING",
         sig
     )
     .execute(pool)

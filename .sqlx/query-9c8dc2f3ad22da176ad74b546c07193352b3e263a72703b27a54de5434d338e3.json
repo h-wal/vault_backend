@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM vaults ORDER BY created_at ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "vault_pda",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "program_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "network",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "owner_pubkey",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "mint",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "vault_token_account",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "total_balance",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "locked_balance",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "available_balance",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "total_deposited",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_withdrawn",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 12,
+        "name": "last_synced_at",
+        "type_info": "Timestamp"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9c8dc2f3ad22da176ad74b546c07193352b3e263a72703b27a54de5434d338e3"
+}

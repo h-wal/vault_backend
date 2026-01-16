@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE vaults\n            SET\n                total_balance     = total_balance - $2,\n                available_balance = available_balance - $2,\n                last_synced_at    = now()\n            WHERE vault_pda = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "323d8c3a39a73dc20c5476e0111c80ceb5d4c9a59d779806257c10c5c8d95f42"
+}

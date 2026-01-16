@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::NaiveDateTime;
 use sqlx::PgPool;
 
 #[derive(Debug)]
@@ -14,8 +14,8 @@ pub struct VaultRow {
     pub available_balance: i64,
     pub total_deposited: i64,
     pub total_withdrawn: i64,
-    pub created_at: DateTime<Utc>,
-    pub last_synced_at: DateTime<Utc>,
+    pub created_at: NaiveDateTime,
+    pub last_synced_at: NaiveDateTime,
 }
 
 pub struct VaultRepository<'a> {
@@ -99,6 +99,35 @@ impl<'a> VaultRepository<'a> {
         Ok(rows)
     }
 
+    /// Fetch the vault record for a given owner, if any.
+    pub async fn get_vault_by_owner(
+        &self,
+        owner_pubkey: &str,
+    ) -> anyhow::Result<Option<VaultRow>> {
+        let row = sqlx::query_as!(
+            VaultRow,
+            r#"SELECT * FROM vaults WHERE owner_pubkey = $1"#,
+            owner_pubkey,
+        )
+        .fetch_optional(self.pool)
+        .await?;
+
+        Ok(row)
+    }
+
+    /// Compute total value locked (TVL) across all vaults.
+    pub async fn get_tvl(&self) -> anyhow::Result<i64> {
+        // Explicitly cast the SUM to BIGINT so SQLx doesn't require the
+        // `bigdecimal` feature for NUMERIC.
+        let tvl: i64 = sqlx::query_scalar!(
+            r#"SELECT COALESCE(SUM(total_balance)::BIGINT, 0) AS "tvl!: i64" FROM vaults"#,
+        )
+        .fetch_one(self.pool)
+        .await?;
+
+        Ok(tvl)
+    }
+
     /// Insert a new vault when a `VaultInitialized` event is seen.
     ///
     /// Fields we don't get from the event are filled with sensible defaults.
@@ -109,10 +138,13 @@ impl<'a> VaultRepository<'a> {
         mint: &str,
         timestamp: i64,
     ) -> anyhow::Result<()> {
-        // Convert unix timestamp -> DateTime<Utc>, fall back to now() if conversion fails.
-        let created_at = NaiveDateTime::from_timestamp_opt(timestamp, 0)
-            .map(|naive| DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
-            .unwrap_or_else(|| Utc::now());
+        // Convert unix timestamp -> NaiveDateTime, fall back to now() if conversion fails.
+        use chrono::{DateTime, Utc};
+        let created_at = {
+            let utc_dt = DateTime::<Utc>::from_timestamp(timestamp, 0)
+                .unwrap_or_else(|| Utc::now());
+            utc_dt.naive_utc()
+        };
 
         let vault = VaultRow {
             vault_pda: vault_pda.to_string(),
@@ -140,9 +172,10 @@ impl<'a> VaultRepository<'a> {
         new_total_balance: i64,
         timestamp: i64,
     ) -> anyhow::Result<()> {
-        let ts = NaiveDateTime::from_timestamp_opt(timestamp, 0)
-            .map(|naive| DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc))
+        use chrono::{DateTime, Utc};
+        let utc_dt = DateTime::<Utc>::from_timestamp(timestamp, 0)
             .unwrap_or_else(|| Utc::now());
+        let ts = utc_dt.naive_utc();
 
         sqlx::query!(
             r#"

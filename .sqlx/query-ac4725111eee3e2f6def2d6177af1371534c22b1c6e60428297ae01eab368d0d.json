@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO balance_snapshots (\n                vault_pda,\n                program_id,\n                network,\n                snapshot_time,\n                total_balance,\n                locked_balance,\n                available_balance\n            )\n            VALUES ($1,$2,$3,$4,$5,$6,$7)\n            ON CONFLICT (vault_pda, snapshot_time) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Text",
+        "Timestamp",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ac4725111eee3e2f6def2d6177af1371534c22b1c6e60428297ae01eab368d0d"
+}

@@ -53,9 +53,11 @@ pub fn decode_events(tx: &EncodedTransactionWithStatusMeta) -> anyhow::Result<Ve
         None => return Ok(events),
     };
 
+    use solana_transaction_status::option_serializer::OptionSerializer;
+
     let logs = match &meta.log_messages {
-        Some(l) => l,
-        None => return Ok(events),
+        OptionSerializer::Some(l) => l,
+        _ => return Ok(events),
     };
 
     for log in logs {

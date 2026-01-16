@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::NaiveDateTime;
 use sqlx::PgPool;
 
 use crate::db::vault_repo::VaultRow;
@@ -8,7 +8,7 @@ pub struct BalanceSnapshotRow {
     pub vault_pda: String,
     pub program_id: String,
     pub network: String,
-    pub snapshot_time: DateTime<Utc>,
+    pub snapshot_time: NaiveDateTime,
     pub total_balance: i64,
     pub locked_balance: i64,
     pub available_balance: i64,
@@ -62,7 +62,7 @@ impl<'a> SnapshotRepository<'a> {
     pub async fn snapshot_all_vaults(
         &self,
         vaults: &[VaultRow],
-        snapshot_time: DateTime<Utc>,
+        snapshot_time: NaiveDateTime,
     ) -> anyhow::Result<()> {
         for vault in vaults {
             let snapshot = BalanceSnapshotRow {

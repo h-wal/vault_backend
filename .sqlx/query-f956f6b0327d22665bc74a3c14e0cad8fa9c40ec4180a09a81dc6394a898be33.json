@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT COALESCE(SUM(total_balance)::BIGINT, 0) AS \"tvl!: i64\" FROM vaults",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "tvl!: i64",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f956f6b0327d22665bc74a3c14e0cad8fa9c40ec4180a09a81dc6394a898be33"
+}
