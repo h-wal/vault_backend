@@ -1,5 +1,5 @@
 use std::time::Duration;
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use tracing::warn;
 
 // Config for retry logic - controls how many times we retry and how long we wait
@@ -195,18 +195,21 @@ mod tests {
 
     #[test]
     fn test_is_retryable_error_timeout() {
+        use anyhow::anyhow;
         let err = anyhow!("Request timeout");
         assert!(is_retryable_error(&err));
     }
 
     #[test]
     fn test_is_retryable_error_connection() {
+        use anyhow::anyhow;
         let err = anyhow!("Connection refused");
         assert!(is_retryable_error(&err));
     }
 
     #[test]
     fn test_is_not_retryable_error() {
+        use anyhow::anyhow;
         let err = anyhow!("Invalid account");
         assert!(!is_retryable_error(&err));
     }

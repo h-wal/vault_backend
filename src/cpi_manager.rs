@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
-    instruction::Instruction,
     message::Message,
     pubkey::Pubkey,
+    signature::{Keypair, Signature, Signer},
     transaction::Transaction,
 };
 use sqlx::PgPool;
@@ -12,33 +12,33 @@ use sqlx::PgPool;
 use crate::db::program_repo::ProgramRepository;
 use crate::transaction_builder::TransactionBuilder;
 
-/// CPIManager is a backend abstraction for other services (position manager,
-/// liquidation engine, settlement relayer) that need to lock/unlock collateral
+/// CPIManager is the  abstraction layer  for other services (position manager,
+/// liquidation engine, settlement relayer) it locks/unlocks collateral
 /// in the on-chain vault program.
-///
-/// It does two things:
-/// - Builds the correct vault instructions (lock/unlock) using the existing
-///   TransactionBuilder.
-/// - Persists cross-program calls into `program_calls` for audit / analytics,
-///   and checks that caller programs are authorized.
+
 pub struct CPIManager<'a> {
     pub rpc: Arc<RpcClient>,
     pub program_id: Pubkey,
     pub pool: &'a PgPool,
+    pub payer: Option<Keypair>,
 }
 
 impl<'a> CPIManager<'a> {
+
     pub fn new(rpc: Arc<RpcClient>, program_id: Pubkey, pool: &'a PgPool) -> Self {
-        Self { rpc, program_id, pool }
+        Self { rpc, program_id, pool, payer: None }
     }
 
-    // fn tx_builder(&self) -> TransactionBuilder {
-    //     TransactionBuilder::new(self.program_id)
-    // }
+    /// Create CPIManager with a payer keypair for sending transactions
+    pub fn new_with_payer(rpc: Arc<RpcClient>, program_id: Pubkey, pool: &'a PgPool, payer: Keypair) -> Self {
+        Self { rpc, program_id, pool, payer: Some(payer) }
+    }
 
-    /// Internal helper: ensure a given program is authorized to perform CPIs
-    /// against the vault program.
-    async fn ensure_authorized_program(
+    fn tx_builder(&self) -> TransactionBuilder {
+        TransactionBuilder::new(self.program_id)
+    }
+
+    async fn ensure_authorized_program( //checks authority of the pubkey willign to make the cpi
         &self,
         program_id: &Pubkey,
     ) -> anyhow::Result<()> {
@@ -54,9 +54,7 @@ impl<'a> CPIManager<'a> {
         Ok(())
     }
 
-    /// Build a lock-collateral instruction and record the intended call.
-    ///
-    /// This returns an unsigned transaction the caller can sign and send.
+
     pub async fn build_lock_collateral_tx(
         &self,
         caller_program: &Pubkey,
@@ -67,13 +65,20 @@ impl<'a> CPIManager<'a> {
         slot: i64,
         block_time: chrono::DateTime<chrono::Utc>,
     ) -> anyhow::Result<String> {
+        // Verify the caller program is authorized to make CPI calls
         self.ensure_authorized_program(caller_program).await?;
 
-        // In a real implementation, you'd have explicit lock/unlock
-        // instructions in the on-chain program + IDL; here we treat lock as a
-        // semantic operation and only record the call in the DB.
-        let tx = self.build_empty_tx(user_pubkey).await?;
+        // Build the actual lock_collateral instruction
+        let tx_builder = self.tx_builder();
+        let lock_ix = tx_builder.build_lock_collateral_ix(caller_program, user_pubkey, amount)?;
 
+        // Build a transaction with the lock instruction
+        let recent_blockhash = self.rpc.get_latest_blockhash()?;
+        let message = Message::new(&[lock_ix], Some(user_pubkey));
+        let mut tx = Transaction::new_unsigned(message);
+        tx.message.recent_blockhash = recent_blockhash;
+
+        // Record the call in the database for audit trail
         let repo = ProgramRepository::new(self.pool);
         repo
             .insert_program_call(
@@ -90,13 +95,15 @@ impl<'a> CPIManager<'a> {
             )
             .await?;
 
+        // Serialize and base64 encode the transaction
         use base64::engine::general_purpose::STANDARD;
         use base64::Engine;
         let encoded = STANDARD.encode(bincode::serialize(&tx)?);
         Ok(encoded)
     }
 
-    /// Build an unlock-collateral transaction and record the call.
+    /// Build an unlock-collateral transaction with actual on-chain instruction
+    /// This unlocks locked balance back to available balance on the blockchain
     pub async fn build_unlock_collateral_tx(
         &self,
         caller_program: &Pubkey,
@@ -107,10 +114,20 @@ impl<'a> CPIManager<'a> {
         slot: i64,
         block_time: chrono::DateTime<chrono::Utc>,
     ) -> anyhow::Result<String> {
+        // Verify the caller program is authorized to make CPI calls
         self.ensure_authorized_program(caller_program).await?;
 
-        let tx = self.build_empty_tx(user_pubkey).await?;
+        // Build the actual unlock_collateral instruction
+        let tx_builder = self.tx_builder();
+        let unlock_ix = tx_builder.build_unlock_collateral_ix(caller_program, user_pubkey, amount)?;
 
+        // Build a transaction with the unlock instruction
+        let recent_blockhash = self.rpc.get_latest_blockhash()?;
+        let message = Message::new(&[unlock_ix], Some(user_pubkey));
+        let mut tx = Transaction::new_unsigned(message);
+        tx.message.recent_blockhash = recent_blockhash;
+
+        // Record the call in the database for audit trail
         let repo = ProgramRepository::new(self.pool);
         repo
             .insert_program_call(
@@ -127,23 +144,103 @@ impl<'a> CPIManager<'a> {
             )
             .await?;
 
+        // Serialize and base64 encode the transaction
         use base64::engine::general_purpose::STANDARD;
         use base64::Engine;
         let encoded = STANDARD.encode(bincode::serialize(&tx)?);
         Ok(encoded)
     }
 
-    /// Construct an empty transaction with the correct recent blockhash that
-    /// the caller can append instructions to on their side if desired.
-    async fn build_empty_tx(
+    /// Lock collateral and send the transaction to the blockchain
+    /// This method requires a payer to be set via `new_with_payer`
+    pub async fn lock_collateral(
         &self,
-        payer: &Pubkey,
-    ) -> anyhow::Result<Transaction> {
+        caller_program: &Pubkey,
+        user_pubkey: &Pubkey,
+        amount: u64,
+        slot: i64,
+        block_time: chrono::DateTime<chrono::Utc>,
+    ) -> anyhow::Result<Signature> {
+        let payer = self.payer.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("CPIManager must be created with payer to send transactions"))?;
+
+        // Verify authorization
+        self.ensure_authorized_program(caller_program).await?;
+
+        // Build the lock instruction
+        let tx_builder = self.tx_builder();
+        let lock_ix = tx_builder.build_lock_collateral_ix(caller_program, user_pubkey, amount)?;
+
+        // Build and send transaction
         let recent_blockhash = self.rpc.get_latest_blockhash()?;
-        let message = Message::new(&[] as &[Instruction], Some(payer));
-        let mut tx = Transaction::new_unsigned(message);
-        tx.message.recent_blockhash = recent_blockhash;
-        Ok(tx)
+        let mut tx = Transaction::new_with_payer(&[lock_ix], Some(&payer.pubkey()));
+        tx.sign(&[payer], recent_blockhash);
+
+        let signature = self.rpc.send_and_confirm_transaction(&tx)?;
+
+        // Record in database for audit trail
+        let (vault_pda, _) = tx_builder.derive_vault_pda(user_pubkey);
+        let repo = ProgramRepository::new(self.pool);
+        repo
+            .insert_program_call(
+                &signature.to_string(),
+                &caller_program.to_string(),
+                &vault_pda.to_string(),
+                "lock",
+                Some(amount as i64),
+                slot,
+                block_time.naive_utc(),
+            )
+            .await?;
+
+        Ok(signature)
     }
+
+    /// Unlock collateral and send the transaction to the blockchain
+    /// This method requires a payer to be set via `new_with_payer`
+    pub async fn unlock_collateral(
+        &self,
+        caller_program: &Pubkey,
+        user_pubkey: &Pubkey,
+        amount: u64,
+        slot: i64,
+        block_time: chrono::DateTime<chrono::Utc>,
+    ) -> anyhow::Result<Signature> {
+        let payer = self.payer.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("CPIManager must be created with payer to send transactions"))?;
+
+        // Verify authorization
+        self.ensure_authorized_program(caller_program).await?;
+
+        // Build the unlock instruction
+        let tx_builder = self.tx_builder();
+        let unlock_ix = tx_builder.build_unlock_collateral_ix(caller_program, user_pubkey, amount)?;
+
+        // Build and send transaction
+        let recent_blockhash = self.rpc.get_latest_blockhash()?;
+        let mut tx = Transaction::new_with_payer(&[unlock_ix], Some(&payer.pubkey()));
+        tx.sign(&[payer], recent_blockhash);
+
+        let signature = self.rpc.send_and_confirm_transaction(&tx)?;
+
+        // Record in database for audit trail
+        let (vault_pda, _) = tx_builder.derive_vault_pda(user_pubkey);
+        let repo = ProgramRepository::new(self.pool);
+        repo
+            .insert_program_call(
+                &signature.to_string(),
+                &caller_program.to_string(),
+                &vault_pda.to_string(),
+                "unlock",
+                Some(amount as i64),
+                slot,
+                block_time.naive_utc(),
+            )
+            .await?;
+
+        Ok(signature)
+    }
+
+    
 }
 
